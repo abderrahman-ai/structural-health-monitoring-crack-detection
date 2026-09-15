@@ -3,13 +3,11 @@
 <br/>
 
 ```
-██████╗ ██████╗  ██████╗     ███╗   ██╗██████╗ ███╗   ██╗
-██╔══██╗██╔══██╗██╔════╝     ████╗  ██║██╔══██╗████╗  ██║
-██████╔╝██████╔╝██║  ███╗    ██╔██╗ ██║██████╔╝██╔██╗ ██║
-██╔══██╗██╔═══╝ ██║   ██║    ██║╚██╗██║██╔═══╝ ██║╚██╗██║
-██║  ██║██║     ╚██████╔╝    ██║ ╚████║██║     ██║ ╚████║
-╚═╝  ╚═╝╚═╝      ╚═════╝     ╚═╝  ╚═══╝╚═╝     ╚═╝  ╚═══╝
-                         STRUCTURAL
+   _______________  __  ________________  ______  ___    __ 
+  / ___/_  __/ __ \/ / / / ____/_  __/ / / / __ \/   |  / / 
+  \__ \ / / / /_/ / / / / /     / / / / / / /_/ / /| | / /  
+ ___/ // / / _, _/ /_/ / /___  / / / /_/ / _, _/ ___ |/ /___
+/____//_/ /_/ |_|\____/\____/ /_/  \____/_/ |_/_/  |_/_____/
 ```
 
 <h3>Structural Health & Crack Displacement Monitor</h3>
@@ -231,7 +229,7 @@ git clone https://github.com/abderrahman-ai/structural-health-monitoring-crack-d
 git checkout -b feat/new-capability
 
 # 3. Commit your changes
-git commit -m "feat: enhance node error handling"
+git commit -m "style: update unique custom ASCII art banner"
 
 # 4. Push and open a Pull Request
 git push origin feat/new-capability
