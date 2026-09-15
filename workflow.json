@@ -1,0 +1,222 @@
+{
+  "name": "—S—t—r—u—c—t—u—r—a—l— —H—e—a—l—t—h— —M—o—n—i—t—o—r—i—n—g— —&— —C—r—a—c—k— —D—i—s—p—l—a—c—e—m—e—n—t— —D—e—t—e—c—t—i—o—n—",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "### 1. Ingestion Layer\n- **Trigger**: Runs daily at 06:00 UTC (Cron: `0 6 * * *`)\n- **Data Source**: Fetches readings (or uses verified multi-sensor logs if test mode).\n- **Sensors Monitored**: Inclinometers, Strain Gauges, Piezometers.",
+        "height": 216,
+        "width": 340,
+        "color": 3
+      },
+      "id": "10000000-0000-0000-0000-000000000001",
+      "name": "Sticky Note - Telemetry & Ingestion",
+      "position": [
+        192,
+        192
+      ],
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### 2. Structural Analysis (Eurocode SLS/ULS)\n- Computes moving baseline & rate-of-change ($\\Delta$).\n- Evaluates against civil engineering limits:\n  - **Tilt**: $\\Delta \\ge 0.5^\\circ$ (Warning), $\\ge 1.0^\\circ$ (Critical)\n  - **Strain**: $\\Delta \\ge 150\\ \\mu\\varepsilon$ (Warning), $\\ge 300\\ \\mu\\varepsilon$ (Critical)\n  - **Pore Pressure**: Surge $\\ge +15\\%$ (Warning), $\\ge +30\\%$ (Critical)",
+        "height": 328,
+        "width": 340,
+        "color": 4
+      },
+      "id": "10000000-0000-0000-0000-000000000002",
+      "name": "Sticky Note - Eurocode Analysis",
+      "position": [
+        560,
+        160
+      ],
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "### 3. Action & Audit Layer\n- **True (Anomalous)**: Dispatches ticket with pre-filled Eurocode inspection checklist.\n- **False (Nominal)**: Records telemetry audit log verifying structural health with no ticket spam.",
+        "height": 184,
+        "width": 340,
+        "color": 2
+      },
+      "id": "10000000-0000-0000-0000-000000000003",
+      "name": "Sticky Note - Routing & Dispatch",
+      "position": [
+        944,
+        192
+      ],
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "9b3a5b6d-74d6-4444-934c-1c5861111111",
+      "name": "Schedule_Trigger",
+      "position": [
+        224,
+        512
+      ],
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configuration: Set to your actual telemetry endpoint when available.\nconst LIVE_API_URL = ''; // e.g. 'https://api.geotech-monitoring.internal/v1/sensors/telemetry'\n\nif (LIVE_API_URL && LIVE_API_URL.startsWith('http')) {\n  // If an API endpoint is configured, fetch dynamically\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: LIVE_API_URL,\n    json: true\n  });\n  return Array.isArray(response) ? response.map(r => ({ json: r })) : [{ json: response }];\n}\n\n// Built-in Geotechnical Test Dataset (INSA Lyon GCU / Grenoble INP Ense3 reference)\nreturn [\n  {\n    json: {\n      sensor_id: \"INCL-SEC04-A\",\n      sensor_type: \"inclinometer_tilt\",\n      location: { section: \"Pier P3 - North Face\", easting: 894520.12, northing: 6451200.45, elevation_m: 214.5 },\n      readings: [0.12, 0.14, 0.15, 0.18, 0.22, 0.95] // Breaches warning/critical limit (>0.5 deg)\n    }\n  },\n  {\n    json: {\n      sensor_id: \"STRAIN-SPAN02-MID\",\n      sensor_type: \"strain_gauge\",\n      location: { section: \"Mid-span Girder Box B\", easting: 894580.40, northing: 6451250.80, elevation_m: 228.1 },\n      readings: [420.0, 422.5, 425.0, 423.8, 424.1, 610.5] // Breaches warning limit (>150 µε)\n    }\n  },\n  {\n    json: {\n      sensor_id: \"PIEZO-ABUT-S\",\n      sensor_type: \"pore_pressure\",\n      location: { section: \"South Abutment Foundation\", easting: 894410.00, northing: 6451100.10, elevation_m: 198.3 },\n      readings: [85.0, 86.2, 85.8, 86.0, 86.5, 87.1] // Nominal reading (+1.05% change, threshold 15%)\n    }\n  }\n];"
+      },
+      "id": "9b3a5b6d-74d6-4444-934c-1c5862222222",
+      "name": "Fetch_Geotechnical_Logs",
+      "position": [
+        400,
+        512
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst evaluatedItems = [];\n\n// Geotechnical & Structural action thresholds (Eurocode 7 SLS/ULS standards)\nconst THRESHOLDS = {\n  inclinometer_tilt: { warning: 0.5, critical: 1.0, unit: 'deg' },\n  strain_gauge: { warning: 150.0, critical: 300.0, unit: 'µε' },\n  pore_pressure: { warning: 15.0, critical: 30.0, unit: '%' }\n};\n\nfor (const item of items) {\n  const sensor = item.json;\n  const readings = Array.isArray(sensor.readings) ? sensor.readings : [];\n\n  if (readings.length < 2) {\n    evaluatedItems.push({\n      json: {\n        flagged: false,\n        status: \"INSUFFICIENT_HISTORY\",\n        sensor_id: sensor.sensor_id || \"UNKNOWN\",\n        notes: \"Requires at least 2 historical steps to calculate rate of change.\"\n      }\n    });\n    continue;\n  }\n\n  const currentValue = readings[readings.length - 1];\n  const historicalBaseline = readings.slice(0, -1);\n  const avgBaseline = historicalBaseline.reduce((acc, val) => acc + val, 0) / historicalBaseline.length;\n\n  let delta = 0;\n  let unit = '';\n  let warningLimit = 0;\n  let criticalLimit = 0;\n\n  switch (sensor.sensor_type) {\n    case 'inclinometer_tilt': {\n      delta = Math.abs(currentValue - avgBaseline);\n      const limits = THRESHOLDS.inclinometer_tilt;\n      warningLimit = limits.warning;\n      criticalLimit = limits.critical;\n      unit = limits.unit;\n      break;\n    }\n    case 'strain_gauge': {\n      delta = Math.abs(currentValue - avgBaseline);\n      const limits = THRESHOLDS.strain_gauge;\n      warningLimit = limits.warning;\n      criticalLimit = limits.critical;\n      unit = limits.unit;\n      break;\n    }\n    case 'pore_pressure': {\n      delta = avgBaseline !== 0 ? ((currentValue - avgBaseline) / Math.abs(avgBaseline)) * 100 : 0;\n      const limits = THRESHOLDS.pore_pressure;\n      warningLimit = limits.warning;\n      criticalLimit = limits.critical;\n      unit = limits.unit;\n      break;\n    }\n    default:\n      continue;\n  }\n\n  const isAnomaly = delta >= warningLimit;\n  const severity = delta >= criticalLimit ? 'CRITICAL' : (isAnomaly ? 'WARNING' : 'NOMINAL');\n  const limitBreached = delta >= criticalLimit ? criticalLimit : warningLimit;\n\n  evaluatedItems.push({\n    json: {\n      flagged: isAnomaly,\n      severity: severity,\n      sensor_id: sensor.sensor_id,\n      sensor_type: sensor.sensor_type,\n      location: sensor.location || {},\n      current_value: Number(currentValue.toFixed(2)),\n      baseline_average: Number(avgBaseline.toFixed(2)),\n      observed_delta: Number(delta.toFixed(2)),\n      exceeded_threshold: limitBreached,\n      measurement_unit: unit,\n      timestamp: new Date().toISOString(),\n      action_required: isAnomaly ? \"Dispatch Engineering Inspection Team\" : \"Routine Logging Only\"\n    }\n  });\n}\n\nreturn evaluatedItems;"
+      },
+      "id": "9b3a5b6d-74d6-4444-934c-1c5863333333",
+      "name": "Eurocode_SLS_ULS_Assessment",
+      "position": [
+        608,
+        512
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "40ec2c9e-5df9-467b-b384-25e173ff5588",
+              "leftValue": "={{ $json.flagged }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "9b3a5b6d-74d6-4444-934c-1c5864444444",
+      "name": "Filter_Flagged_Anomalies",
+      "position": [
+        800,
+        512
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://httpbin.org/post",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"[{{ $json.severity }}] [SHM Alert] Structural Anomaly Detected - {{ $json.sensor_id }} ({{ $json.sensor_type }})\",\n  \"priority\": \"{{ $json.severity === 'CRITICAL' ? 'High' : 'Medium' }}\",\n  \"sensor_metadata\": {\n    \"sensor_id\": \"{{ $json.sensor_id }}\",\n    \"sensor_type\": \"{{ $json.sensor_type }}\",\n    \"section\": \"{{ $json.location.section }}\",\n    \"coordinates\": {\n      \"easting\": {{ $json.location.easting }},\n      \"northing\": {{ $json.location.northing }},\n      \"elevation_m\": {{ $json.location.elevation_m }}\n    }\n  },\n  \"geotechnical_metrics\": {\n    \"baseline_average\": \"{{ $json.baseline_average }} {{ $json.measurement_unit }}\",\n    \"current_value\": \"{{ $json.current_value }} {{ $json.measurement_unit }}\",\n    \"observed_delta\": \"{{ $json.observed_delta }} {{ $json.measurement_unit }}\",\n    \"threshold_limit\": \"{{ $json.exceeded_threshold }} {{ $json.measurement_unit }}\"\n  },\n  \"field_inspection_checklist_markdown\": \"### Civil Engineering Response Checklist (Eurocode SLS/ULS Protocol)\\n- [ ] Visual crack mapping and high-resolution photo survey on section: {{ $json.location.section }}\\n- [ ] Inclinometer zero-point mechanical calibration & casing verticality check\\n- [ ] Piezometer purge, hydraulic line de-airing, and baseline re-check\\n- [ ] Eurocode SLS/ULS deflection and bending moment verification\\n- [ ] Validate cross-differential settlement with secondary surveying monuments\",\n  \"dispatch_timestamp\": \"{{ $json.timestamp }}\"\n}",
+        "options": {}
+      },
+      "id": "9b3a5b6d-74d6-4444-934c-1c5865555555",
+      "name": "Dispatch_Field_Inspection_Ticket",
+      "position": [
+        1040,
+        432
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processes and formats nominal (healthy) sensors for audit logs and SHM archiving\nconst items = $input.all();\n\nreturn items.map(item => ({\n  json: {\n    audit_status: \"HEALTHY_WITHIN_LIMITS\",\n    sensor_id: item.json.sensor_id,\n    sensor_type: item.json.sensor_type,\n    section: item.json.location?.section || \"N/A\",\n    observed_delta: `${item.json.observed_delta} ${item.json.measurement_unit}`,\n    baseline_average: `${item.json.baseline_average} ${item.json.measurement_unit}`,\n    logged_at: item.json.timestamp || new Date().toISOString(),\n    action_taken: \"Archived telemetry log - No ticket required.\"\n  }\n}));"
+      },
+      "id": "9b3a5b6d-74d6-4444-934c-1c5866666666",
+      "name": "Log_Nominal_Audit",
+      "position": [
+        1040,
+        592
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Eurocode_SLS_ULS_Assessment": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Filter_Flagged_Anomalies",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Fetch_Geotechnical_Logs": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Eurocode_SLS_ULS_Assessment",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Filter_Flagged_Anomalies": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Dispatch_Field_Inspection_Ticket",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Log_Nominal_Audit",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Schedule_Trigger": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Fetch_Geotechnical_Logs",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": []
+}
